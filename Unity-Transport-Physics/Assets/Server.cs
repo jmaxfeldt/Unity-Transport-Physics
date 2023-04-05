@@ -30,7 +30,7 @@ public class Server : MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
-        playerPrefab = Resources.Load("ServerPlayer") as GameObject;
+        playerPrefab = Resources.Load("Player") as GameObject;
         players = new List<ServerPlayer>(maxPlayers);
         InitPlayersList();
         nextTick = Time.time;
@@ -372,7 +372,7 @@ public class Server : MonoBehaviour
         {
             uint seqNum = reader.ReadUInt();   
             float delta = reader.ReadFloat();
-            players[connection.InternalId].playerMove.PhysicsMove(delta, reader.ReadByte());
+            players[connection.InternalId].playerMove.Move(reader.ReadByte());
         }
         else if (type == 10)//
         {

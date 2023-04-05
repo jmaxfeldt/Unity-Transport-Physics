@@ -11,8 +11,7 @@ public class ClientPlayer
     public float interpTime = .1f;
 
     GameObject playerCharacterRep;
-    public Player playerControl = null; //will remain null on all but the local player.  This is what handles inputs etc.
-    public PhysicsMove physMove = null;
+    public PlayerControl playerControl = null; //will remain null on all but the local player.  This is what handles inputs etc.
     PlayerMove playerMove = null;
 
     List<InterpBufferData> interpolationBuffer; //should use some kind of pool for this
@@ -33,22 +32,10 @@ public class ClientPlayer
         {
             playerMove = playerCharacterRep.GetComponent<PlayerMove>();
             if (isLocal)
-            {
-                if (usePhysicsMove)
-                {
-                    PhysicsMove physMove = playerCharacterRep.AddComponent<PhysicsMove>();
-                    physMove.id = id;
-                    physMove.isLocalPlayer = true;
-                    physMove.isSpawned = true;
-
-                }
-                else
-                {
-                    Player newPlayer = playerCharacterRep.AddComponent<Player>();
-                    newPlayer.id = id;
-                    newPlayer.isLocalPlayer = true;
-                    newPlayer.isSpawned = true;
-                }
+            {           
+                playerControl = playerCharacterRep.AddComponent<PlayerControl>();  
+                playerControl.isLocalPlayer = true;
+                playerControl.isSpawned = true;         
             }
             isSpawned = true;
             return true;
@@ -118,29 +105,15 @@ public class ClientPlayer
     public MonoBehaviour GetPlayerControl()
     {
         if (isLocal)
-        {
-            if (usePhysicsMove)
+        {        
+            if (playerCharacterRep != null && playerCharacterRep.GetComponent<PlayerControl>() != null)
             {
-                if (playerCharacterRep != null && playerCharacterRep.GetComponent<PhysicsMove>() != null)
-                {
-                    return playerCharacterRep.GetComponent<PhysicsMove>();
-                }
-                else
-                {
-                    Debug.Log("Could not find the player control.");
-                }
+                return playerCharacterRep.GetComponent<PlayerControl>();
             }
             else
             {
-                if (playerCharacterRep != null && playerCharacterRep.GetComponent<Player>() != null)
-                {
-                    return playerCharacterRep.GetComponent<Player>();
-                }
-                else
-                {
-                    Debug.Log("Could not find the player control.");
-                }
-            }
+                Debug.Log("Could not find the player control.");
+            }                
         }
         else
         {

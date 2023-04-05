@@ -2,7 +2,7 @@ using UnityEngine;
 using Unity.Networking.Transport;
 using NetMessages;
 
-public class ServerPlayer : MonoBehaviour
+public class ServerPlayer
 {
     public int id = -1;
     public NetworkConnection connection;
@@ -71,16 +71,11 @@ public class ServerPlayer : MonoBehaviour
                         {
                             continue;
                         }
-                        if (usePhysicsMove)
-                        {
-                            //Debug.LogError("Received input sequence (" + latestInputs.messages[i].sequenceNum + ") bitmask value: " + Convert.ToString(latestInputs.messages[i].moveKeysBitmask, 2).PadLeft(8, '0'));
-                            playerMove.PhysicsMove(latestInputs.messages[i].deltaTime, latestInputs.messages[i].moveKeysBitmask);
-                            Debug.LogError("Server position after phys move for input " + latestInputs.messages[i].sequenceNum + ": " + playerCharacterRep.transform.position);
-                        }
-                        else
-                        {
-                            playerMove.BitmaskMove(latestInputs.messages[i].deltaTime, latestInputs.messages[i].moveKeysBitmask);
-                        }
+                        
+                        //Debug.LogError("Received input sequence (" + latestInputs.messages[i].sequenceNum + ") bitmask value: " + Convert.ToString(latestInputs.messages[i].moveKeysBitmask, 2).PadLeft(8, '0'));
+                        playerMove.Move(latestInputs.messages[i].moveKeysBitmask);
+                        Debug.LogError("Server position after phys move for input " + latestInputs.messages[i].sequenceNum + ": " + playerCharacterRep.transform.position);
+                        
                         processedSinceLast++;
                         //Debug.Log("Server player position: " + serverPlayer.transform.position);
                         lastProcessedInput = latestInputs.messages[i].sequenceNum;

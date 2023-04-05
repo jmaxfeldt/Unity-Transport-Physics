@@ -20,10 +20,9 @@ public class Client : MonoBehaviour
     public NetworkPipeline reliableSeqSimPipeline;
     public NetworkPipeline unreliableSimPipeline;
 
+    public ClientPlayer localPlayer; //Quick reference to the local player
     public GameObject playerPrefab;
     public List<ClientPlayer> players;
-    public ClientPlayer localPlayer;
-    public Player playerControl;
 
     public TMP_Text pingText;
     float pingDelay = 1.0f;
@@ -36,8 +35,8 @@ public class Client : MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
-        playerPrefab = Resources.Load("ClientPlayer") as GameObject;
-        pingText = GameObject.Find("PingText").GetComponent<TMP_Text>();
+        playerPrefab = Resources.Load("Player") as GameObject;
+        //pingText = GameObject.Find("PingText").GetComponent<TMP_Text>();
         InitPlayersList();
         lastTime = Time.time;
         lastPing = Time.time;
@@ -116,13 +115,18 @@ public class Client : MonoBehaviour
         SendToServer(reliableSeqSimPipeline, new RequestSpawnMessage());//This sends a request to the server to spawn the local player character.  it's only here for testing purposes  
     }
 
+    public void Disconnect()
+    {
+        SendToServer(reliableSeqSimPipeline, new DisconnectNotificationMessage());
+    }
+
     public void OnDisconnect()
     {
         Debug.LogError("OnDisconnect called");
         RemoveAllPlayers();
         netDriver.Disconnect(connection);
         netDriver.Dispose();
-        Destroy(playerControl);
+        //Destroy(playerControl);
         Destroy(this);
     }
 
@@ -223,7 +227,7 @@ public class Client : MonoBehaviour
                         uint seqNum = ServerMessages.SnapshotMessage.GetLastSequence(ref reader);
                         //Debug.Log("Received snapshot from server for this player.  Last Processed: " + seqNum + "  -Position: " + newPos);               
                         //Debug.LogError("Received new position from server: " + newPos);                     
-                        physMove.HandleSnapshot(seqNum, newPos, newRot);                                           
+                        localPlayer.playerControl.HandleSnapshot(seqNum, newPos, newRot);                                           
                     }
                     else
                     {
@@ -245,7 +249,7 @@ public class Client : MonoBehaviour
             }
         }
 
-        if(type == 2)
+        else if(type == 2)
         {
             //Debug.LogError("RECEIVED FULL STATE.  SIZE: " + reader.Length);
             while (reader.GetBytesRead() < reader.Length)
@@ -264,7 +268,7 @@ public class Client : MonoBehaviour
             }
         }
 
-        if (type == 10)//on connection id receive from server
+        else if (type == 10)//on connection id receive from server
         {
             OnConnect(reader.ReadInt(), reader.ReadFloat());
         }
@@ -281,14 +285,11 @@ public class Client : MonoBehaviour
             if (reader.ReadByte() == 1)
             {
                 if (playerPrefab != null)
-                {
-                    localPlayer.Spawn(playerPrefab, ReadExtensions.ReadVector3(ref reader), ReadExtensions.ReadQuaternion(ref reader));
-                    
-                    physMove = localPlayer.GetPlayerControl() as PhysicsMove;
-                    if (physMove == null)
+                {                    
+                    if(localPlayer.Spawn(playerPrefab, ReadExtensions.ReadVector3(ref reader), ReadExtensions.ReadQuaternion(ref reader)))
                     {
-                        Debug.LogError("UH OH.  COULDN'T GET PHYSICSMOVE!");
-                    }                
+                        localPlayer.playerControl.SetClientRef(this);
+                    }
                 }
                 else
                 {
@@ -348,7 +349,7 @@ public class Client : MonoBehaviour
         {
             if (pingText != null)
             {
-                pingText.text = "Ping: " + (Time.time - reader.ReadFloat()) * 1000;
+                //pingText.text = "Ping: " + (Time.time - reader.ReadFloat()) * 1000;
             }
         }
         else if (type == 255)//disconnect
