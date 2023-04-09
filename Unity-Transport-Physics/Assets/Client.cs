@@ -24,6 +24,8 @@ public class Client : MonoBehaviour
     public GameObject playerPrefab;
     public List<ClientPlayer> players;
 
+    public PhysicsSceneLoader physScene;
+
     public TMP_Text pingText;
     float pingDelay = 1.0f;
     float lastPing;
@@ -37,6 +39,7 @@ public class Client : MonoBehaviour
     {
         playerPrefab = Resources.Load("Player") as GameObject;
         //pingText = GameObject.Find("PingText").GetComponent<TMP_Text>();
+        physScene = GameObject.FindFirstObjectByType<PhysicsSceneLoader>(); //for reconciliation physics scene
         InitPlayersList();
         lastTime = Time.time;
         lastPing = Time.time;
@@ -60,7 +63,7 @@ public class Client : MonoBehaviour
     NetworkEndPoint ConfigClient(ushort port)
     {
         NetworkSettings netSettings = new NetworkSettings();
-        netSettings.WithSimulatorStageParameters(3000, 256, 30, 0, 0, 0);//, 0, 0, 0);
+        netSettings.WithSimulatorStageParameters(3000, 256, 100, 0, 0, 0);//, 0, 0, 0);
         netDriver = NetworkDriver.Create(netSettings);
 
         reliableSeqSimPipeline = netDriver.CreatePipeline(typeof(ReliableSequencedPipelineStage), typeof(SimulatorPipelineStage));
@@ -227,7 +230,7 @@ public class Client : MonoBehaviour
                         uint seqNum = ServerMessages.SnapshotMessage.GetLastSequence(ref reader);
                         //Debug.Log("Received snapshot from server for this player.  Last Processed: " + seqNum + "  -Position: " + newPos);               
                         //Debug.LogError("Received new position from server: " + newPos);                     
-                        localPlayer.playerControl.HandleSnapshot(seqNum, newPos, newRot);                                           
+                        //localPlayer.playerControl.HandleSnapshot(seqNum, newPos, newRot);                                           
                     }
                     else
                     {
@@ -267,6 +270,12 @@ public class Client : MonoBehaviour
                 }
             }
         }
+        else if(type == 3) //stateinfo
+        {
+            //Debug.LogError("Received state info from the server");
+            StateInfo sInfo = new StateInfo(reader.ReadUInt(), ReadExtensions.ReadVector3(ref reader), ReadExtensions.ReadQuaternion(ref reader), ReadExtensions.ReadVector3(ref reader), ReadExtensions.ReadVector3(ref reader));
+            localPlayer.playerControl.HandleSnapshot(sInfo.sequence, sInfo.position, sInfo.rotation, sInfo.linearVelocity, sInfo.angularVelocity);
+        }
 
         else if (type == 10)//on connection id receive from server
         {
@@ -289,6 +298,8 @@ public class Client : MonoBehaviour
                     if(localPlayer.Spawn(playerPrefab, ReadExtensions.ReadVector3(ref reader), ReadExtensions.ReadQuaternion(ref reader)))
                     {
                         localPlayer.playerControl.SetClientRef(this);
+                        physScene.SpawnCharacterRep(playerPrefab, Vector3.up, Quaternion.identity);
+                        localPlayer.playerControl.physScene = this.physScene;
                     }
                 }
                 else

@@ -15,8 +15,8 @@ public class Server : MonoBehaviour
     //The indices of this list should always match the player id which is set using the connection's internal id.  Might be too convoluted/not worth the higher speed?
     private List<ServerPlayer> players;
 
-    NetworkPipeline reliableSeqSimPipeline;
-    NetworkPipeline unreliableSimPipeline;
+    public NetworkPipeline reliableSeqSimPipeline;
+    public NetworkPipeline unreliableSimPipeline;
 
     public GameObject playerPrefab;
 
@@ -50,7 +50,7 @@ public class Server : MonoBehaviour
     public void ConfigServer()
     {
         NetworkSettings netSettings = new NetworkSettings();
-        netSettings.WithSimulatorStageParameters(3000, 256, 30, 0, 0, 0);//, 0, 0, 0);
+        netSettings.WithSimulatorStageParameters(3000, 256, 100, 0, 0, 0);//, 0, 0, 0);
         netDriver = NetworkDriver.Create(netSettings);
 
         reliableSeqSimPipeline = netDriver.CreatePipeline(typeof(ReliableSequencedPipelineStage), typeof(SimulatorPipelineStage));
@@ -166,7 +166,7 @@ public class Server : MonoBehaviour
         if (!connections.Contains(connection) && !players[connection.InternalId].inUse)
         {
             connections.Add(connection);
-            players[connection.InternalId] = new ServerPlayer(connection);
+            players[connection.InternalId] = new ServerPlayer(connection, this);
             return true;
         }
         return false;
@@ -269,11 +269,11 @@ public class Server : MonoBehaviour
             if (Time.time >= nextTick)
             {
                 nextTick = Time.time + (1 / tickRate);
-                if (connections.Length > 0)
-                {                  
-                    snapshotSequence++;
-                    SendSnapshotToAll(unreliableSimPipeline, CreateSnapshot());
-                }
+                //if (connections.Length > 0)
+                //{                  
+                //    snapshotSequence++;
+                //    SendSnapshotToAll(unreliableSimPipeline, CreateSnapshot());
+                //}
             }
         }
     }
@@ -341,8 +341,9 @@ public class Server : MonoBehaviour
     {
         if (type == 1)//Multi Input.  This would come from a client sending all unacknowledged inputs and is probably the most commonly received message
         {
-            uint lastSeq = MultiInputMessage.GetLastSequence(ref reader);
-
+            uint lastSeq = reader.ReadUInt();//MultiInputMessage.GetLastSequence(ref reader);
+            
+            //Debug.LogError("Latest inputs last seq: " + lastSeq);
             if (lastSeq > players[connection.InternalId].lastProcessedInput && lastSeq > players[connection.InternalId].latestInputs.lastSequence)
             {
                 players[connection.InternalId].latestInputs = MultiInputMessage.ReadMessage(ref reader);
@@ -375,8 +376,7 @@ public class Server : MonoBehaviour
             players[connection.InternalId].playerMove.Move(reader.ReadByte());
         }
         else if (type == 10)//
-        {
-            //Debug.Log("MultiInput.  Number of inputs received: " + reader.Length / InputMessage.maxLength);
+        { 
 
             
         }

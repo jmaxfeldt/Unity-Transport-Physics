@@ -8,6 +8,8 @@ public class PlayerControl : MonoBehaviour
     Client clientRef = null;
     PlayerMove playerMove = null;
 
+    public PhysicsSceneLoader physScene;
+
     uint inputSequence = 1;
     uint responseCount = 0;
     uint lastResponseSeqNum = 0;
@@ -17,16 +19,16 @@ public class PlayerControl : MonoBehaviour
     Quaternion lastRot;
     Vector3 lerpTarget;
 
-    float inputPollingRate = 33f;
+    float inputPollingRate = 50f;
     float nextPollTime = 0;
     float lastPollTime = 0;
 
     public bool isLocalPlayer;
     public bool isSpawned = false;
-    public bool sendUnackdInputs = false;
+    public bool sendUnackdInputs = true;
 
     bool usePrediction = true;
-    bool useReconciliation = false;
+    bool useReconciliation = true;
 
     List<InputMessage> unacknowledgedInputs = new List<InputMessage>(); //use a pool for this?
     InputQueue inputQueue;
@@ -45,43 +47,8 @@ public class PlayerControl : MonoBehaviour
         lastPollTime = Time.time;
     }
 
-
+    int processedCount = 0;
     void FixedUpdate()
-    {
-        //InputMessage input = new InputMessage(inputSequence, deltaTime, moveKeysBitmask);
-        if (isSpawned)
-        {
-            while (inputQueue.numInputs > 0)
-            {
-                InputMessage input = new InputMessage(inputSequence, Time.fixedDeltaTime, inputQueue.Dequeue());
-
-                if (usePrediction)
-                {
-                    playerMove.Move(input.moveKeysBitmask);
-                    input.predictedPos = transform.position;
-                    input.predictedRot = transform.rotation;
-                    Debug.LogError("Predicted position after Client phys move for input " + inputSequence + ": " + input.predictedPos);
-                    //Debug.Log("Sequence " + inputSequence + " predicted position: " + input.predictedPos + " -Delta time: " + deltaTime);
-                }
-                unacknowledgedInputs.Add(input);
-                inputSequence++;
-
-                if (sendUnackdInputs && unacknowledgedInputs.Count > 0)
-                {
-                    //Debug.LogError("Sending input sequence (" + inputSequence +") bitmask value: " + Convert.ToString(input.moveKeysBitmask, 2).PadLeft(8, '0'));
-                    clientRef.SendToServer(clientRef.unreliableSimPipeline, new MultiInputMessage(unacknowledgedInputs));            
-                }
-                else
-                {
-                    clientRef.SendToServer(clientRef.unreliableSimPipeline, input);
-                }
-            }
-        }
-        //clientInputCounter.text = "Client Inputs: " + inputSequence;
-    }
-
-    // Update is called once per frame
-    void Update()
     {
         if (isLocalPlayer && isSpawned)
         {
@@ -105,39 +72,116 @@ public class PlayerControl : MonoBehaviour
                 moveKeysBitmask |= 8;
             }
 
-            if (Time.time >= nextPollTime)
-            {
-                nextPollTime = Time.time + 1 / inputPollingRate;
-                float deltaTime = Time.time - lastPollTime;
-                //Debug.Log("Delta Time: " + deltaTime);            
-                lastPollTime = Time.time;
-
-                if (moveKeysBitmask != 0)
-                {
-                    inputQueue.Enqueue(moveKeysBitmask);
-                }
-                moveKeysBitmask = 0;
+            
+            inputQueue.Enqueue(moveKeysBitmask);
+            
+            
+            moveKeysBitmask = 0;
                 //Debug.Log(Convert.ToString(moveKeysBitmask, 2).PadLeft(8, '0'));
+        }
+      
+
+        //InputMessage input = new InputMessage(inputSequence, deltaTime, moveKeysBitmask);
+        if (isSpawned)
+        {
+            //Debug.LogError("Input Queue Length: " + inputQueue.numInputs);
+            while (inputQueue.numInputs > 0)
+            {
+              
+                InputMessage input = new InputMessage(inputSequence, Time.fixedDeltaTime, inputQueue.Dequeue());
+
+                if (usePrediction)
+                {
+                    playerMove.Move(input.moveKeysBitmask);
+
+                    input.predictedPos = transform.position;
+                    input.predictedRot = transform.rotation;
+                    input.predictedVelocity = GetComponent<Rigidbody>().velocity;
+                    input.predictedAngularVelocity = GetComponent<Rigidbody>().angularVelocity;
+                    //Debug.LogError("Predicted position after Client phys move for input " + inputSequence + ": " + input.predictedPos);
+                    //Debug.Log("Sequence " + inputSequence + " predicted position: " + input.predictedPos + " -Delta time: " + deltaTime);
+                }
+                //Debug.LogError("Client processed input count: " + processedCount);
+                processedCount++;
+                unacknowledgedInputs.Add(input);
+                inputSequence++;
+
+                if (sendUnackdInputs && unacknowledgedInputs.Count > 0)
+                {
+                    //Debug.LogError("Sending input sequence (" + inputSequence +") bitmask value: " + Convert.ToString(input.moveKeysBitmask, 2).PadLeft(8, '0'));
+                    clientRef.SendToServer(clientRef.unreliableSimPipeline, new MultiInputMessage(unacknowledgedInputs));                 
+                }
+                else
+                {
+                    clientRef.SendToServer(clientRef.unreliableSimPipeline, input);
+                }
             }
         }
+        //clientInputCounter.text = "Client Inputs: " + inputSequence;
     }
 
-    public void HandleSnapshot(uint responseNum, Vector3 position, Quaternion rotation) //Gets called on the client when the server sends updated position
-    {      
+    // Update is called once per frame
+    void Update()
+    {
+        //if (isLocalPlayer && isSpawned)
+        //{
+        //    if (Input.GetKey(KeyCode.W))
+        //    {
+        //        moveKeysBitmask |= 1;
+        //    }
+
+        //    if (Input.GetKey(KeyCode.S))
+        //    {
+        //        moveKeysBitmask |= 2;
+        //    }
+
+        //    if (Input.GetKey(KeyCode.A))
+        //    {
+        //        moveKeysBitmask |= 4;
+        //    }
+
+        //    if (Input.GetKey(KeyCode.D))
+        //    {
+        //        moveKeysBitmask |= 8;
+        //    }
+
+        //    if (Time.time >= nextPollTime)
+        //    {
+        //        nextPollTime = Time.time + 1 / inputPollingRate;
+        //        float deltaTime = Time.time - lastPollTime;
+        //        //Debug.Log("Delta Time: " + deltaTime);            
+        //        lastPollTime = Time.time;
+
+        //        if (moveKeysBitmask != 0)
+        //        {
+        //            inputQueue.Enqueue(moveKeysBitmask);
+        //        }
+        //        moveKeysBitmask = 0;
+        //        //Debug.Log(Convert.ToString(moveKeysBitmask, 2).PadLeft(8, '0'));
+        //    }
+        //}
+    }
+
+    public void HandleSnapshot(uint responseNum, Vector3 position, Quaternion rotation, Vector3 linearVelocity, Vector3 angularVelocity) //Gets called on the client when the server sends updated position
+    {
+        bool hasPredictionError = false;
+
         if (responseNum > lastResponseSeqNum) //Server doesn't resend snapshots.  This can't be used for things that must be reliable
         {
             lastResponseSeqNum = responseNum;
             //lerpTarget = position;          
-            transform.SetPositionAndRotation(position, rotation);
+
 
             //Debug.Log("Response to " + responseNum + " position: " + position);
             for (int i = 0; i < unacknowledgedInputs.Count; i++)//CHECKING FOR PREDICTION ERRORS?
             {
                 if (unacknowledgedInputs[i].sequenceNum == responseNum)
                 {
-                    if (unacknowledgedInputs[i].predictedPos != position)
+                    if (unacknowledgedInputs[i].predictedPos != position || unacknowledgedInputs[i].predictedRot != rotation || unacknowledgedInputs[i].predictedVelocity != linearVelocity || unacknowledgedInputs[i].predictedAngularVelocity != angularVelocity)
                     {
-                        Debug.LogWarning("A client prediction error has occured.");
+                        hasPredictionError = true;
+                        //Debug.LogWarning("A client prediction error has occured.");
+                        //Debug.LogError("Position Distance off: " + Vector3.Distance(unacknowledgedInputs[i].predictedPos, position));
                         //Debug.LogWarning("Sequence " + responseNum + "  -Predicted for response " + unacknowledgedInputs[i].sequenceNum + ": " + unacknowledgedInputs[i].predictedPos + "  - Actual: " + position);
                         //unacknowledgedInputs.RemoveAt(i);                   
                     }
@@ -149,20 +193,45 @@ public class PlayerControl : MonoBehaviour
             if (useReconciliation)
             {
                 int loopCount = 0;
+
+                transform.SetPositionAndRotation(position, rotation);
+                playerMove.SetVelocities(linearVelocity, angularVelocity);
+                
                 while (loopCount < unacknowledgedInputs.Count)
                 {
                     if (unacknowledgedInputs[loopCount].sequenceNum <= responseNum)
                     {
                         unacknowledgedInputs.RemoveAt(loopCount);
                         //unackdCounter.text = "Unack'd Inputs: " + unacknowledgedInputs.Count;
-                    }
+                    }                  
                     else
-                    {
-                        playerMove.Move(unacknowledgedInputs[loopCount].moveKeysBitmask);
+                    {                      
+                        if(hasPredictionError)
+                        {
+                            StateInfo simState = physScene.Simulate(transform.position, transform.rotation, GetComponent<Rigidbody>().velocity, GetComponent<Rigidbody>().angularVelocity, unacknowledgedInputs[loopCount].moveKeysBitmask);
+                            transform.SetPositionAndRotation(simState.position, simState.rotation);
+                            GetComponent<Rigidbody>().velocity = simState.linearVelocity;
+                            GetComponent<Rigidbody>().angularVelocity = simState.angularVelocity;
+
+                            unacknowledgedInputs[loopCount].predictedPos = transform.position;
+                            unacknowledgedInputs[loopCount].predictedRot = transform.rotation;
+                            unacknowledgedInputs[loopCount].predictedVelocity = GetComponent<Rigidbody>().velocity;
+                            unacknowledgedInputs[loopCount].predictedAngularVelocity = GetComponent<Rigidbody>().angularVelocity;
+                        }
+                        else
+                        {
+                            StateInfo simState = physScene.Simulate(transform.position, transform.rotation, GetComponent<Rigidbody>().velocity, GetComponent<Rigidbody>().angularVelocity, unacknowledgedInputs[loopCount].moveKeysBitmask);
+                            transform.SetPositionAndRotation(simState.position, simState.rotation);
+                            GetComponent<Rigidbody>().velocity = simState.linearVelocity;
+                            GetComponent<Rigidbody>().angularVelocity = simState.angularVelocity;
+
+                            //playerMove.Move(unacknowledgedInputs[loopCount].moveKeysBitmask);
+                        }
                         //BitmaskMove(unacknowledgedInputs[loopCount].sequenceNum, unacknowledgedInputs[loopCount].deltaTime, unacknowledgedInputs[loopCount].moveKeysBitmask);
                         loopCount++;
                     }
                 }
+                //Debug.LogError("Velocity after reconciliation: " + GetComponent<Rigidbody>().velocity + " -at sequence: " + inputSequence);
             }
             else
             {

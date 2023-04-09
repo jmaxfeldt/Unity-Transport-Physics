@@ -84,6 +84,28 @@ namespace NetMessages
             }
         }
     }
+    
+    public class StateInfoMessage : INetMessage
+    {
+        byte id = 3;
+        StateInfo stateInfo;
+
+        public StateInfoMessage(StateInfo stateInfo)
+        {
+            this.stateInfo = stateInfo;
+        }
+
+        public void WriteMessage(ref DataStreamWriter writer)
+        {
+            writer.WriteByte(id);
+            writer.WriteUInt(stateInfo.sequence);
+            WriteExtensions.WriteVector3(stateInfo.position, ref writer);
+            WriteExtensions.WriteQuaternion(stateInfo.rotation, ref writer);
+            WriteExtensions.WriteVector3(stateInfo.linearVelocity, ref writer);
+            WriteExtensions.WriteVector3(stateInfo.angularVelocity, ref writer);
+        }
+    }
+
     //Used to send the player ID and server tickrate to a newly connected client
     public class OnConnectMessage : INetMessage
     {
@@ -247,12 +269,31 @@ namespace NetMessages
         public short playerId;
         public Vector3 position;
         public Quaternion rotation;
+        
 
         public SnapShotInfo(short playerId, Vector3 position, Quaternion rotation)
         {
             this.playerId = playerId;
             this.position = position;
+            this.rotation = rotation;          
+        }
+    }
+
+    public struct StateInfo
+    {
+        public uint sequence;
+        public Vector3 position;
+        public Quaternion rotation;
+        public Vector3 linearVelocity;
+        public Vector3 angularVelocity;
+
+        public StateInfo(uint sequence, Vector3 position, Quaternion rotation, Vector3 linearVelocity, Vector3 angularVelocity)
+        {
+            this.sequence = sequence;
+            this.position = position;
             this.rotation = rotation;
+            this.linearVelocity = linearVelocity;
+            this.angularVelocity = angularVelocity;
         }
     }
     #endregion
@@ -267,6 +308,8 @@ namespace NetMessages
         public byte moveKeysBitmask = 0;
         public Vector3 predictedPos;
         public Quaternion predictedRot;
+        public Vector3 predictedVelocity;
+        public Vector3 predictedAngularVelocity;
 
         public InputMessage(uint sequenceNum, float deltaTime, byte moveKeysBitmask)
         {
