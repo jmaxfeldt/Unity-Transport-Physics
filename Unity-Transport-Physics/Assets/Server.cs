@@ -50,7 +50,7 @@ public class Server : MonoBehaviour
     public void ConfigServer()
     {
         NetworkSettings netSettings = new NetworkSettings();
-        netSettings.WithSimulatorStageParameters(3000, 256, 100, 0, 0, 0);//, 0, 0, 0);
+        netSettings.WithSimulatorStageParameters(3000, 256, 100, 0, 0, 5);//, 0, 0, 0);
         netDriver = NetworkDriver.Create(netSettings);
 
         reliableSeqSimPipeline = netDriver.CreatePipeline(typeof(ReliableSequencedPipelineStage), typeof(SimulatorPipelineStage));

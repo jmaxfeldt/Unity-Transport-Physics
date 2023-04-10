@@ -24,7 +24,7 @@ public class Client : MonoBehaviour
     public GameObject playerPrefab;
     public List<ClientPlayer> players;
 
-    public PhysicsSceneLoader physScene;
+    public ReconciliationPhysScene physScene;
 
     public TMP_Text pingText;
     float pingDelay = 1.0f;
@@ -39,7 +39,7 @@ public class Client : MonoBehaviour
     {
         playerPrefab = Resources.Load("Player") as GameObject;
         //pingText = GameObject.Find("PingText").GetComponent<TMP_Text>();
-        physScene = GameObject.FindFirstObjectByType<PhysicsSceneLoader>(); //for reconciliation physics scene
+        physScene = GameObject.FindFirstObjectByType<ReconciliationPhysScene>(); //for reconciliation physics scene
         InitPlayersList();
         lastTime = Time.time;
         lastPing = Time.time;
@@ -63,7 +63,7 @@ public class Client : MonoBehaviour
     NetworkEndPoint ConfigClient(ushort port)
     {
         NetworkSettings netSettings = new NetworkSettings();
-        netSettings.WithSimulatorStageParameters(3000, 256, 100, 0, 0, 0);//, 0, 0, 0);
+        netSettings.WithSimulatorStageParameters(3000, 256, 100, 0, 0, 5);//, 0, 0, 0);
         netDriver = NetworkDriver.Create(netSettings);
 
         reliableSeqSimPipeline = netDriver.CreatePipeline(typeof(ReliableSequencedPipelineStage), typeof(SimulatorPipelineStage));

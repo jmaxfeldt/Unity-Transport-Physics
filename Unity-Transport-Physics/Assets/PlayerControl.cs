@@ -8,16 +8,11 @@ public class PlayerControl : MonoBehaviour
     Client clientRef = null;
     PlayerMove playerMove = null;
 
-    public PhysicsSceneLoader physScene;
+    public ReconciliationPhysScene physScene;
 
     uint inputSequence = 1;
     uint responseCount = 0;
     uint lastResponseSeqNum = 0;
-
-    float moveSpeed = 10;
-    Vector3 lastPos;
-    Quaternion lastRot;
-    Vector3 lerpTarget;
 
     float inputPollingRate = 50f;
     float nextPollTime = 0;
@@ -39,7 +34,6 @@ public class PlayerControl : MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
-        //clientRef = FindObjectOfType<Client>();
         playerMove = GetComponent<PlayerMove>();
         inputQueue = new InputQueue(20);
 
