@@ -73,7 +73,8 @@ public class ClientPlayer
                 //{
                 playerCharacterRep.transform.position = Vector3.Lerp(interpolationBuffer[0].position, interpolationBuffer[1].position,
                                                                     (renderTimeStamp - interpolationBuffer[0].timeStamp) / (interpolationBuffer[1].timeStamp - interpolationBuffer[0].timeStamp));
-
+                playerCharacterRep.transform.rotation = Quaternion.Lerp(interpolationBuffer[0].rotation, interpolationBuffer[1].rotation,
+                                                                    (renderTimeStamp - interpolationBuffer[0].timeStamp) / (interpolationBuffer[1].timeStamp - interpolationBuffer[0].timeStamp));
                 //}
             }
             else if (interpolationBuffer.Count == 1 && renderTimeStamp < interpolationBuffer[0].timeStamp)

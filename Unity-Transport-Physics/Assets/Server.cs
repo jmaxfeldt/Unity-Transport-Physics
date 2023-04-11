@@ -29,6 +29,16 @@ public class Server : MonoBehaviour
 
     public bool isStarted;
 
+    public float TickRate
+    {
+        get => tickRate;
+        set
+        {
+            tickRate = value;
+            SendToAll(reliableSeqSimPipeline, new TickrateUpdateMessage(TickRate));
+        }
+    }
+
     // Start is called before the first frame update
     void Start()
     {
@@ -38,16 +48,6 @@ public class Server : MonoBehaviour
         nextTick = Time.time;
         physScene = GameObject.FindFirstObjectByType<ServerMultiMovePhysScene>();
         Debug.Log("Did the whole START thing on server behaviour");
-    }
-
-    public float TickRate
-    {
-        get => tickRate;
-        set
-        {
-            tickRate = value;
-            SendToAll(reliableSeqSimPipeline, new TickrateUpdateMessage(TickRate));
-        }
     }
 
     public void ConfigServer()
@@ -205,6 +205,8 @@ public class Server : MonoBehaviour
                 }
                 //Debug.LogError("Inputs processed this tick: " + players[connections[i].InternalId].processedSinceLast);
             }
+            snapshotSequence++;
+            SnapshotCreateAndSend();           
         }
     }
 
@@ -281,24 +283,23 @@ public class Server : MonoBehaviour
         }
     }
 
-    SnapshotMessage CreateSnapshot()
-    {
-        SnapshotMessage ssMsg = new SnapshotMessage(snapshotSequence);
+    void SnapshotCreateAndSend()
+    {        
         for (int i = 0; i < connections.Length; i++)
         {
             int connId = connections[i].InternalId;
-            if (players[connId].isSpawned)// && players[connId].hasNewSnapshotData)//temporary. do something in server player to check this probably
+            SnapshotMessage ssMsg = new SnapshotMessage(snapshotSequence);
+            ssMsg.playerState = players[connId].GetStateInfo(); 
+
+            for (int k = 0; k < connections.Length; k++)
             {
-                ssMsg.AddInfo(players[connId].GetSnapshotInfo());
+                if (players[connections[k].InternalId].isSpawned && players[connections[k].InternalId].id != connId)// && players[connId].hasNewSnapshotData)//temporary. do something in server player to check this probably
+                {
+                    ssMsg.AddInfo(players[connections[k].InternalId].GetSnapshotInfo());
+                }
             }
-        }
-        return ssMsg;
-        //if (ssMsg.snapShotInfos.Count > 0)
-        //{
-        //    //Debug.LogWarning("Snapshot message has data from " + ssMsg.snapShotInfos.Count + " Player");
-        //    return ssMsg;
-        //}
-        //return null;
+            SendToClient(unreliableSimPipeline, connections[i], ssMsg);
+        }       
     }
 
     FullStateMessage CreateFullStateMessage()
@@ -361,7 +362,7 @@ public class Server : MonoBehaviour
         {
             if (!players[connection.InternalId].isSpawned)
             {
-                if (players[connection.InternalId].Spawn(playerPrefab))
+                if (players[connection.InternalId].Spawn(playerPrefab, new Vector3(0,2,0), Quaternion.identity))
                 {
                     physScene.SpawnCharacterRep(playerPrefab, new Vector3(0, 2, 0), Quaternion.identity);
                     SendToClient(reliableSeqSimPipeline, connection, new SpawnRequestReplyMessage(1, new Vector3(0, 2, 0), Quaternion.identity));

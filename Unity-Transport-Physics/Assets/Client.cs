@@ -209,7 +209,7 @@ public class Client : MonoBehaviour
         if(type == 1)
         {
             uint snapshotSeqNum = reader.ReadUInt();//This is for testing.  Not sure if I should send this to the client at all.  Can be used to detect out of order snapshots that could mess with interpolation
-                                                    //Debug.Log("Snapshot received.  Length: " + reader.Length );
+            //Debug.Log("Snapshot received.  Length: " + reader.Length );
 
             if (snapshotSeqNum > lastSnapshotSequence)
             {
@@ -218,32 +218,27 @@ public class Client : MonoBehaviour
                     Debug.LogError("LOST SNAPSHOT(S): " + (snapshotSeqNum - (lastSnapshotSequence + 1)));
                 }
                 lastSnapshotSequence = snapshotSeqNum;
-                while (reader.GetBytesRead() < reader.Length - 4) // -4 because of the trailing sequence num.  this is awful and fragile.  Find a different way
+
+                //StateInfo sInfo = new StateInfo(reader.ReadUInt(), ReadExtensions.ReadVector3(ref reader), ReadExtensions.ReadQuaternion(ref reader), ReadExtensions.ReadVector3(ref reader), ReadExtensions.ReadVector3(ref reader));
+                localPlayer.playerControl.HandleSnapshot(reader.ReadUInt(), ReadExtensions.ReadVector3(ref reader), ReadExtensions.ReadQuaternion(ref reader), ReadExtensions.ReadVector3(ref reader), ReadExtensions.ReadVector3(ref reader));
+
+                while (reader.GetBytesRead() < reader.Length)
                 {
                     short playerId = reader.ReadShort();
                     //byte numProcessed = reader.ReadByte();
                     //Debug.LogError("new snapshot info for player ID: " + playerId + " - snapshot sequence: " + snapshotSeqNum);
                     Vector3 newPos = ReadExtensions.ReadVector3(ref reader); //new Vector3(reader.ReadFloat(), reader.ReadFloat(), reader.ReadFloat());
-                    Quaternion newRot = ReadExtensions.ReadQuaternion(ref reader);//new Quaternion(reader.ReadFloat(), reader.ReadFloat(), reader.ReadFloat(), reader.ReadFloat());
-                    if (playerId == thisClientID)
+                    Quaternion newRot = ReadExtensions.ReadQuaternion(ref reader);//new Quaternion(reader.ReadFloat(), reader.ReadFloat(), reader.ReadFloat(), reader.ReadFloat());                   
+                  
+                    if (useInterpolation)
                     {
-                        uint seqNum = ServerMessages.SnapshotMessage.GetLastSequence(ref reader);
-                        //Debug.Log("Received snapshot from server for this player.  Last Processed: " + seqNum + "  -Position: " + newPos);               
-                        //Debug.LogError("Received new position from server: " + newPos);                     
-                        //localPlayer.playerControl.HandleSnapshot(seqNum, newPos, newRot);                                           
+                        players[playerId].AddToInterpBuffer(Time.time, newPos, newRot);
+                        //players[playerId].interpPool.AddItem(Time.time, newPos, newRot);
                     }
                     else
                     {
-                        if (useInterpolation)
-                        {
-                            players[playerId].AddToInterpBuffer(Time.time, newPos, newRot);
-                            //players[playerId].interpPool.AddItem(Time.time, newPos, newRot);
-                        }
-                        else
-                        {
-                            players[playerId].DummyMove(newPos, newRot);
-                        }
-                    }
+                        players[playerId].DummyMove(newPos, newRot);
+                    }             
                 }
             }
             else

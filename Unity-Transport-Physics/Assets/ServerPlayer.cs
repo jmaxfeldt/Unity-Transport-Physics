@@ -8,7 +8,10 @@ public class ServerPlayer
     public int id = -1;
     public NetworkConnection connection;
     public Server serverRef;
+
     public GameObject playerCharacterRep = null;
+    public Rigidbody rb = null;
+
     public GameObject physSceneCharRep = null;
     public PlayerMove playerMove = null;
     
@@ -34,12 +37,13 @@ public class ServerPlayer
         Debug.LogWarning("New ServerPlayer created.  Internal ID: " + this.connection.InternalId);
     }
 
-    public bool Spawn(GameObject playerCharacter)
+    public bool Spawn(GameObject playerCharacter, Vector3 pos, Quaternion rot)
     {
-        this.playerCharacterRep = GameObject.Instantiate(playerCharacter, new Vector3(0, 2, 0), Quaternion.identity);
+        this.playerCharacterRep = GameObject.Instantiate(playerCharacter, pos, rot);
         if (this.playerCharacterRep != null)
         {
             playerMove = playerCharacterRep.GetComponent<PlayerMove>();
+            rb = playerCharacterRep.GetComponent<Rigidbody>();
             isSpawned = true;
             lastPos = playerCharacter.transform.position;
             lastRot = playerCharacter.transform.rotation;            
@@ -82,15 +86,15 @@ public class ServerPlayer
                         }
                         else
                         {                           
-                            StateInfo newState = serverRef.physScene.Simulate(playerCharacterRep.transform.position, playerCharacterRep.transform.rotation, playerCharacterRep.GetComponent<Rigidbody>().velocity, playerCharacterRep.GetComponent<Rigidbody>().angularVelocity, latestInputs.messages[i].moveKeysBitmask);
+                            StateInfo newState = serverRef.physScene.Simulate(playerCharacterRep.transform.position, playerCharacterRep.transform.rotation, rb.velocity, rb.angularVelocity, latestInputs.messages[i].moveKeysBitmask);
                             playerCharacterRep.transform.SetPositionAndRotation(newState.position, newState.rotation);
                             playerMove.SetVelocities(newState.linearVelocity, newState.angularVelocity);
                         }                      
                         
                         //Debug.Log("Server player position: " + serverPlayer.transform.position);
                         lastProcessedInput = latestInputs.messages[i].sequenceNum;
-                        serverRef.SendToClient(serverRef.unreliableSimPipeline, connection, new StateInfoMessage(new StateInfo(lastProcessedInput, playerCharacterRep.transform.position, playerCharacterRep.transform.rotation, 
-                                             playerCharacterRep.GetComponent<Rigidbody>().velocity, playerCharacterRep.GetComponent<Rigidbody>().angularVelocity)));
+                        //serverRef.SendToClient(serverRef.unreliableSimPipeline, connection, new StateInfoMessage(new StateInfo(lastProcessedInput, playerCharacterRep.transform.position, playerCharacterRep.transform.rotation, 
+                                             //rb.velocity, rb.angularVelocity)));
                     }
 
                     //Debug.LogError("Processed " + processedInputsCount + " inputs this frame.");
@@ -129,8 +133,8 @@ public class ServerPlayer
         return new SnapShotInfo((short)id, playerCharacterRep.transform.position, playerCharacterRep.transform.rotation);
     }
 
-    //public StateInfo GetStateInfo()
-    //{
-
-    //}
+    public StateInfo GetStateInfo()
+    {
+        return new StateInfo(lastProcessedInput, playerCharacterRep.transform.position, playerCharacterRep.transform.rotation, rb.velocity, rb.angularVelocity);
+    }
 }

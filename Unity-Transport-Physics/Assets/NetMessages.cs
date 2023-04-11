@@ -12,6 +12,7 @@ namespace NetMessages
         byte numProcessed;
         uint snapshotSequenceNum;
         public List<SnapShotInfo> snapShotInfos;
+        public StateInfo playerState;
 
         public SnapshotMessage(uint snapshotSequenceNum)
         {
@@ -29,6 +30,9 @@ namespace NetMessages
         {
             writer.WriteByte(id);
             writer.WriteUInt(snapshotSequenceNum);
+
+            playerState.WriteMessage(ref writer);
+
             for (int i = 0; i < snapShotInfos.Count; i++)
             {
                 writer.WriteShort(snapShotInfos[i].playerId);
@@ -294,6 +298,15 @@ namespace NetMessages
             this.rotation = rotation;
             this.linearVelocity = linearVelocity;
             this.angularVelocity = angularVelocity;
+        }
+
+        public void WriteMessage(ref DataStreamWriter writer)
+        {
+            writer.WriteUInt(sequence);
+            WriteExtensions.WriteVector3(position, ref writer);
+            WriteExtensions.WriteQuaternion(rotation, ref writer);
+            WriteExtensions.WriteVector3(linearVelocity, ref writer);
+            WriteExtensions.WriteVector3(angularVelocity, ref writer);
         }
     }
     #endregion
