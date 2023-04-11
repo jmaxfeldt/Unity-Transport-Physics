@@ -9,13 +9,14 @@ public class ServerPlayer
     public NetworkConnection connection;
     public Server serverRef;
     public GameObject playerCharacterRep = null;
+    public GameObject physSceneCharRep = null;
     public PlayerMove playerMove = null;
     
     Vector3 lastPos;
     Quaternion lastRot;
 
     public MultiInputMessage latestInputs = new MultiInputMessage();
-    public List<StateInfo> latestStates = new List<StateInfo>();
+    //public List<StateInfo> latestStates = new List<StateInfo>();
     public byte processedSinceLast = 0;
     public uint lastProcessedInput = 0;
 
@@ -41,7 +42,7 @@ public class ServerPlayer
             playerMove = playerCharacterRep.GetComponent<PlayerMove>();
             isSpawned = true;
             lastPos = playerCharacter.transform.position;
-            lastRot = playerCharacter.transform.rotation;
+            lastRot = playerCharacter.transform.rotation;            
             return true;
         }
         return false;
@@ -56,21 +57,16 @@ public class ServerPlayer
         }
         return false;
     }
-
-    int processedInputsCount = 0;
+    
     public void ProcessInputs()
     {
         if (isSpawned)
-        {
-            
-            //Debug.Log("Velocity: " + playerCharacterRep.GetComponent<Rigidbody>().velocity);
+        {           
             if (latestInputs != null && latestInputs.lastSequence != lastProcessedInput)
             {
                 //Debug.LogError("Number of inputs to process: " + latestInputs.messages.Length);
                 if (latestInputs.lastSequence > lastProcessedInput)
                 {
-                    //int moveCounter = 0;
-
                     for (int i = 0; i < latestInputs.messages.Length; i++)
                     {
                         //Debug.Log("Sequence at index (" + i + ") is: " + inputs[i].sequenceNum);
@@ -78,21 +74,28 @@ public class ServerPlayer
                         {
                             continue;
                         }
-                        
+
                         //Debug.LogError("Received input sequence (" + latestInputs.messages[i].sequenceNum + ") bitmask value: " + Convert.ToString(latestInputs.messages[i].moveKeysBitmask, 2).PadLeft(8, '0'));
-                        playerMove.Move(latestInputs.messages[i].moveKeysBitmask);
-                        //Debug.LogError("Server processed inputs count: " + processedInputsCount);
-                        Debug.LogError("Velocity after sequence " + latestInputs.messages[i].sequenceNum + ": " + playerCharacterRep.GetComponent<Rigidbody>().velocity);
-                        processedInputsCount++;
-                        //Debug.LogError("Server position after phys move for input " + latestInputs.messages[i].sequenceNum + ": " + playerCharacterRep.transform.position);
+                        if (i == latestInputs.messages.Length - 1)
+                        {
+                            playerMove.Move(latestInputs.messages[i].moveKeysBitmask);
+                        }
+                        else
+                        {                           
+                            StateInfo newState = serverRef.physScene.Simulate(playerCharacterRep.transform.position, playerCharacterRep.transform.rotation, playerCharacterRep.GetComponent<Rigidbody>().velocity, playerCharacterRep.GetComponent<Rigidbody>().angularVelocity, latestInputs.messages[i].moveKeysBitmask);
+                            playerCharacterRep.transform.SetPositionAndRotation(newState.position, newState.rotation);
+                            playerMove.SetVelocities(newState.linearVelocity, newState.angularVelocity);
+                        }                      
                         
-                        processedSinceLast++;
                         //Debug.Log("Server player position: " + serverPlayer.transform.position);
                         lastProcessedInput = latestInputs.messages[i].sequenceNum;
                         serverRef.SendToClient(serverRef.unreliableSimPipeline, connection, new StateInfoMessage(new StateInfo(lastProcessedInput, playerCharacterRep.transform.position, playerCharacterRep.transform.rotation, 
                                              playerCharacterRep.GetComponent<Rigidbody>().velocity, playerCharacterRep.GetComponent<Rigidbody>().angularVelocity)));
-                        //moveCounter++;
                     }
+
+                    //Debug.LogError("Processed " + processedInputsCount + " inputs this frame.");
+                    //processedInputsCount = 0;
+
 
                     //Debug.LogError("Server moved player (" + id + ") " + moveCounter + " times");
                     //SendToClient(connection, new UpdatePositionMessage(lastProcessedClientInput, serverPlayer.transform.position, serverPlayer.transform.rotation));

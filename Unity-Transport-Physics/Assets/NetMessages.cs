@@ -318,6 +318,14 @@ namespace NetMessages
             this.moveKeysBitmask = moveKeysBitmask;
         }
 
+        public void SetPredictions(Vector3 predictedPos, Quaternion predictedRot, Vector3 predictedVelocity, Vector3 predictedAngularVelocity)
+        {
+            this.predictedPos = predictedPos;
+            this.predictedRot = predictedRot;
+            this.predictedVelocity = predictedVelocity;
+            this.predictedAngularVelocity = predictedAngularVelocity;
+        }
+
         public void WriteMessage(ref DataStreamWriter writer)
         {
             writer.WriteByte(id);

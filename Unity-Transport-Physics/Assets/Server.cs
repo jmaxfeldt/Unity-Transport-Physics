@@ -15,6 +15,8 @@ public class Server : MonoBehaviour
     //The indices of this list should always match the player id which is set using the connection's internal id.  Might be too convoluted/not worth the higher speed?
     private List<ServerPlayer> players;
 
+    public ServerMultiMovePhysScene physScene;
+
     public NetworkPipeline reliableSeqSimPipeline;
     public NetworkPipeline unreliableSimPipeline;
 
@@ -34,6 +36,7 @@ public class Server : MonoBehaviour
         players = new List<ServerPlayer>(maxPlayers);
         InitPlayersList();
         nextTick = Time.time;
+        physScene = GameObject.FindFirstObjectByType<ServerMultiMovePhysScene>();
         Debug.Log("Did the whole START thing on server behaviour");
     }
 
@@ -50,7 +53,7 @@ public class Server : MonoBehaviour
     public void ConfigServer()
     {
         NetworkSettings netSettings = new NetworkSettings();
-        netSettings.WithSimulatorStageParameters(3000, 256, 100, 0, 0, 5);//, 0, 0, 0);
+        netSettings.WithSimulatorStageParameters(3000, 256, 50, 0, 0, 0);//, 0, 0, 0);
         netDriver = NetworkDriver.Create(netSettings);
 
         reliableSeqSimPipeline = netDriver.CreatePipeline(typeof(ReliableSequencedPipelineStage), typeof(SimulatorPipelineStage));
@@ -360,6 +363,7 @@ public class Server : MonoBehaviour
             {
                 if (players[connection.InternalId].Spawn(playerPrefab))
                 {
+                    physScene.SpawnCharacterRep(playerPrefab, new Vector3(0, 2, 0), Quaternion.identity);
                     SendToClient(reliableSeqSimPipeline, connection, new SpawnRequestReplyMessage(1, new Vector3(0, 2, 0), Quaternion.identity));
                     SendToAllExcept(reliableSeqSimPipeline, connection.InternalId, new SpawnOtherInformMessage(connection.InternalId, new Vector3(0, 2, 0), Quaternion.identity));
                 }

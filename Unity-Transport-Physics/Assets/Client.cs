@@ -21,7 +21,7 @@ public class Client : MonoBehaviour
     public NetworkPipeline unreliableSimPipeline;
 
     public ClientPlayer localPlayer; //Quick reference to the local player
-    public GameObject playerPrefab;
+    public GameObject playerPrefab; //Gets loaded from the resources folder on Start
     public List<ClientPlayer> players;
 
     public ReconciliationPhysScene physScene;
@@ -55,24 +55,24 @@ public class Client : MonoBehaviour
     }
 
     public bool ConnectToServer()
-    {      
-        connection = netDriver.Connect(ConfigClient(9000));
+    {
+        ConfigClient();
+        NetworkEndPoint endpoint = NetworkEndPoint.LoopbackIpv4;
+        endpoint.Port = 9000;
+        connection = netDriver.Connect(endpoint);
         return true;
     }
 
-    NetworkEndPoint ConfigClient(ushort port)
+    void ConfigClient()
     {
         NetworkSettings netSettings = new NetworkSettings();
-        netSettings.WithSimulatorStageParameters(3000, 256, 100, 0, 0, 5);//, 0, 0, 0);
+        netSettings.WithSimulatorStageParameters(3000, 256, 50, 0, 0, 0);//, 0, 0, 0);
         netDriver = NetworkDriver.Create(netSettings);
 
         reliableSeqSimPipeline = netDriver.CreatePipeline(typeof(ReliableSequencedPipelineStage), typeof(SimulatorPipelineStage));
         unreliableSimPipeline = netDriver.CreatePipeline(typeof(SimulatorPipelineStage));
 
         connection = default(NetworkConnection);
-        NetworkEndPoint endpoint = NetworkEndPoint.LoopbackIpv4;
-        endpoint.Port = port;
-        return endpoint;
     }
 
     public bool AddPlayer(int id, bool islocal)
