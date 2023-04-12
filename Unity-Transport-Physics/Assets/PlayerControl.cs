@@ -10,12 +10,13 @@ public class PlayerControl : MonoBehaviour
     Rigidbody rb;
 
     public ReconciliationPhysScene physScene;
+    public float errorThreshold = .01f;
 
     uint inputSequence = 1;
     uint responseCount = 0;
     uint lastResponseSeqNum = 0;
 
-    float inputPollingRate = 66f;
+    float inputPollingRate = 50f;
     float nextPollTime = 0;
     float lastPollTime = 0;
 
@@ -26,7 +27,8 @@ public class PlayerControl : MonoBehaviour
     bool usePrediction = true;
     bool useReconciliation = true;
 
-    List<InputMessage> unacknowledgedInputs = new List<InputMessage>(); //use a pool for this?
+    List<InputMessage> unackdInputs = new List<InputMessage>(); //use a pool for this?
+    //InputQueue<InputMessage> unackdIns;
     InputQueue inputQueue;
 
     byte moveKeysBitmask = 0;
@@ -38,6 +40,7 @@ public class PlayerControl : MonoBehaviour
         playerMove = GetComponent<PlayerMove>();
         rb = GetComponent<Rigidbody>();
         inputQueue = new InputQueue(20);
+        //unackdIns = new InputQueue<InputMessage>(50);
 
         nextPollTime = Time.time;
         lastPollTime = Time.time;
@@ -104,13 +107,13 @@ public class PlayerControl : MonoBehaviour
                 }
                 //Debug.LogError("Client processed input count: " + processedCount);
                 processedCount++;
-                unacknowledgedInputs.Add(input);
+                unackdInputs.Add(input);
                 inputSequence++;
 
-                if (sendUnackdInputs && unacknowledgedInputs.Count > 0)
+                if (sendUnackdInputs && unackdInputs.Count > 0)
                 {
                     //Debug.LogError("Sending input sequence (" + inputSequence +") bitmask value: " + Convert.ToString(input.moveKeysBitmask, 2).PadLeft(8, '0'));
-                    clientRef.SendToServer(clientRef.unreliableSimPipeline, new MultiInputMessage(unacknowledgedInputs));                 
+                    clientRef.SendToServer(clientRef.unreliableSimPipeline, new MultiInputMessage(unackdInputs));                 
                 }
                 else
                 {
@@ -173,18 +176,20 @@ public class PlayerControl : MonoBehaviour
 
 
             //Debug.Log("Response to " + responseNum + " position: " + position);
-            for (int i = 0; i < unacknowledgedInputs.Count; i++)//CHECKING FOR PREDICTION ERRORS?
+            for (int i = 0; i < unackdInputs.Count; i++)//CHECKING FOR PREDICTION ERRORS?
             {
-                if (unacknowledgedInputs[i].sequenceNum == responseNum)
+                if (unackdInputs[i].sequenceNum == responseNum)
                 {
-                    if (unacknowledgedInputs[i].predictedPos != position || unacknowledgedInputs[i].predictedRot != rotation || unacknowledgedInputs[i].predictedVelocity != linearVelocity || unacknowledgedInputs[i].predictedAngularVelocity != angularVelocity)
+                    if (Mathf.Abs(Vector3.Distance(unackdInputs[i].predictedPos, position)) > errorThreshold)// || Mathf.Abs(Vector3.Distance(unackdInputs[i].predictedRot.eulerAngles, rotation.eulerAngles)) > errorThreshold)
                     {
                         hasPredictionError = true;
-                        //Debug.LogWarning("A client prediction error has occured.");
-                        //Debug.LogError("Position Distance off: " + Vector3.Distance(unacknowledgedInputs[i].predictedPos, position));
-                        //Debug.LogWarning("Sequence " + responseNum + "  -Predicted for response " + unacknowledgedInputs[i].sequenceNum + ": " + unacknowledgedInputs[i].predictedPos + "  - Actual: " + position);
-                        //unacknowledgedInputs.RemoveAt(i);                   
+                        Debug.Log("A position prediction error has occured!  Distance: " + Mathf.Abs(Vector3.Distance(unackdInputs[i].predictedPos, position)));
                     }
+                    //if (Mathf.Abs(Vector3.Distance(unackdInputs[i].predictedRot.eulerAngles, rotation.eulerAngles)) > errorThreshold)
+                    //{
+                    //    hasPredictionError = true;
+                    //    Debug.Log("A rotation prediction error has occured!  Distance: "  + Mathf.Abs(Vector3.Distance(unackdInputs[i].predictedRot.eulerAngles, rotation.eulerAngles)));
+                    //}
                     break;
                 }
             }
@@ -197,25 +202,25 @@ public class PlayerControl : MonoBehaviour
                 transform.SetPositionAndRotation(position, rotation);
                 playerMove.SetVelocities(linearVelocity, angularVelocity);
                 
-                while (loopCount < unacknowledgedInputs.Count)
+                while (loopCount < unackdInputs.Count)
                 {
-                    if (unacknowledgedInputs[loopCount].sequenceNum <= responseNum)
+                    if (unackdInputs[loopCount].sequenceNum <= responseNum)
                     {
-                        unacknowledgedInputs.RemoveAt(loopCount);
+                        unackdInputs.RemoveAt(loopCount);
                         //unackdCounter.text = "Unack'd Inputs: " + unacknowledgedInputs.Count;
                     }                  
                     else
                     {                      
                         if(hasPredictionError)
                         {
-                            StateInfo simState = physScene.Simulate(transform.position, transform.rotation, GetComponent<Rigidbody>().velocity, GetComponent<Rigidbody>().angularVelocity, unacknowledgedInputs[loopCount].moveKeysBitmask);
+                            StateInfo simState = physScene.Simulate(transform.position, transform.rotation, GetComponent<Rigidbody>().velocity, GetComponent<Rigidbody>().angularVelocity, unackdInputs[loopCount].moveKeysBitmask);
                             SetState(simState.position, simState.rotation, simState.linearVelocity, simState.angularVelocity);
 
-                            unacknowledgedInputs[loopCount].SetPredictions(transform.position, transform.rotation, rb.velocity, rb.angularVelocity);               
+                            unackdInputs[loopCount].SetPredictions(transform.position, transform.rotation, rb.velocity, rb.angularVelocity);               
                         }
                         else
                         {
-                            StateInfo simState = physScene.Simulate(transform.position, transform.rotation, GetComponent<Rigidbody>().velocity, GetComponent<Rigidbody>().angularVelocity, unacknowledgedInputs[loopCount].moveKeysBitmask);
+                            StateInfo simState = physScene.Simulate(transform.position, transform.rotation, GetComponent<Rigidbody>().velocity, GetComponent<Rigidbody>().angularVelocity, unackdInputs[loopCount].moveKeysBitmask);
                             SetState(simState.position, simState.rotation, simState.linearVelocity, simState.angularVelocity);
 
                             //playerMove.Move(unacknowledgedInputs[loopCount].moveKeysBitmask);
@@ -228,12 +233,12 @@ public class PlayerControl : MonoBehaviour
             }
             else
             {
-                unacknowledgedInputs.Clear();
+                unackdInputs.Clear();
             }
         }
         //else if(responseNum == lastResponseSeqNum && (position != playerCharacter.transform.position || rotation != playerCharacter.transform.rotation))
         //else if (lastResponseSeqNum == inputSequence && responseNum == lastResponseSeqNum && (position != transform.position || rotation != transform.rotation))
-        else if (unacknowledgedInputs.Count == 0) //Not waiting for a response.  Any new positions received would be server physics moves.  unacked packets are sent repeatedly, so this can't get stuck for long.
+        else if (unackdInputs.Count == 0) //Not waiting for a response.  Any new positions received would be server physics moves.  unacked packets are sent repeatedly, so this can't get stuck for long.
         {
             //transform.SetPositionAndRotation(position, rotation);
         }
@@ -255,6 +260,72 @@ public class PlayerControl : MonoBehaviour
         clientRef = client;
     }
 }
+
+public class UnackdInputQueue
+{
+    int head;
+    int tail;
+    int size;
+    public int numInputs;
+
+    InputMessage[] inputs;
+
+    public UnackdInputQueue(int size)
+    {
+        this.size = size;
+        this.head = 0;
+        this.tail = 0;
+        this.numInputs = 0;
+        inputs = new InputMessage[size];
+    }
+
+    public void Enqueue(InputMessage element)
+    {
+        inputs[head] = element;
+        head++;
+        numInputs++;
+        if (head >= inputs.Length)
+        {
+            head = 0;
+        }
+    }
+
+    public InputMessage Dequeue()
+    {
+        int temp = tail;
+        tail++;
+        if (tail >= inputs.Length)
+        {
+            tail = 0;
+        }
+        numInputs--;
+        return inputs[temp];
+    }
+
+    public void AdvanceTail()
+    {
+        tail++;
+        if (tail >= inputs.Length)
+        {
+            tail = 0;
+        }
+        numInputs--;
+    }
+
+    public void RemoveAckd(uint sequence)
+    {
+        for(int i = 0; i < numInputs; i++)
+        {
+            if(inputs[tail].sequenceNum <= sequence)
+            {
+                AdvanceTail();
+            }
+        }
+    }
+}
+
+
+
 
 public class InputQueue
 {

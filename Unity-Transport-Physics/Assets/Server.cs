@@ -205,8 +205,8 @@ public class Server : MonoBehaviour
                 }
                 //Debug.LogError("Inputs processed this tick: " + players[connections[i].InternalId].processedSinceLast);
             }
-            snapshotSequence++;
-            SnapshotCreateAndSend();           
+            //snapshotSequence++;
+            //SnapshotCreateAndSend();           
         }
     }
 
@@ -274,11 +274,11 @@ public class Server : MonoBehaviour
             if (Time.time >= nextTick)
             {
                 nextTick = Time.time + (1 / tickRate);
-                //if (connections.Length > 0)
-                //{                  
-                //    snapshotSequence++;
-                //    SendSnapshotToAll(unreliableSimPipeline, CreateSnapshot());
-                //}
+                if (connections.Length > 0)
+                {
+                    snapshotSequence++;
+                    SnapshotCreateAndSend();
+                }
             }
         }
     }
@@ -363,8 +363,7 @@ public class Server : MonoBehaviour
             if (!players[connection.InternalId].isSpawned)
             {
                 if (players[connection.InternalId].Spawn(playerPrefab, new Vector3(0,2,0), Quaternion.identity))
-                {
-                    physScene.SpawnCharacterRep(playerPrefab, new Vector3(0, 2, 0), Quaternion.identity);
+                {                  
                     SendToClient(reliableSeqSimPipeline, connection, new SpawnRequestReplyMessage(1, new Vector3(0, 2, 0), Quaternion.identity));
                     SendToAllExcept(reliableSeqSimPipeline, connection.InternalId, new SpawnOtherInformMessage(connection.InternalId, new Vector3(0, 2, 0), Quaternion.identity));
                 }

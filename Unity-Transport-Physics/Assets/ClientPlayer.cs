@@ -65,17 +65,11 @@ public class ClientPlayer
         if (isSpawned)
         {
             if (interpolationBuffer.Count >= 2 && interpolationBuffer[0].timeStamp <= renderTimeStamp && renderTimeStamp <= interpolationBuffer[1].timeStamp)
-            {
-                //Debug.LogError("Actual Interpolation move.  I don't think it gets here");
-                //Debug.LogError("Interpolation.  Element 0 timestamp: " + interpolationBuffer[0].timeStamp + " -Render time stamp: " + renderTimeStamp + " -Element 1 time stamp: " + interpolationBuffer[1].timeStamp);
-                //Debug.LogError("Fraction moved: " + ((renderTimeStamp - interpolationBuffer[0].timeStamp) / (interpolationBuffer[1].timeStamp - interpolationBuffer[0].timeStamp)));
-                //if (playerCharacterRep.transform.position != interpolationBuffer[0].position)
-                //{
+            {            
                 playerCharacterRep.transform.position = Vector3.Lerp(interpolationBuffer[0].position, interpolationBuffer[1].position,
                                                                     (renderTimeStamp - interpolationBuffer[0].timeStamp) / (interpolationBuffer[1].timeStamp - interpolationBuffer[0].timeStamp));
                 playerCharacterRep.transform.rotation = Quaternion.Lerp(interpolationBuffer[0].rotation, interpolationBuffer[1].rotation,
                                                                     (renderTimeStamp - interpolationBuffer[0].timeStamp) / (interpolationBuffer[1].timeStamp - interpolationBuffer[0].timeStamp));
-                //}
             }
             else if (interpolationBuffer.Count == 1 && renderTimeStamp < interpolationBuffer[0].timeStamp)
             {

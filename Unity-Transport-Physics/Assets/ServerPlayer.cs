@@ -9,10 +9,13 @@ public class ServerPlayer
     public NetworkConnection connection;
     public Server serverRef;
 
-    public GameObject playerCharacterRep = null;
+    public GameObject playerCharRep = null;
     public Rigidbody rb = null;
 
+    public ServerMultiMovePhysScene physSceneRef = null;
     public GameObject physSceneCharRep = null;
+    public Rigidbody physRepRB = null;
+
     public PlayerMove playerMove = null;
     
     Vector3 lastPos;
@@ -33,20 +36,45 @@ public class ServerPlayer
         this.connection = connection;
         id = connection.InternalId;
         this.serverRef = serverRef;
+        physSceneRef = serverRef.physScene;
         inUse = true;
         Debug.LogWarning("New ServerPlayer created.  Internal ID: " + this.connection.InternalId);
     }
 
-    public bool Spawn(GameObject playerCharacter, Vector3 pos, Quaternion rot)
+    public bool Spawn(GameObject playerPrefab, Vector3 pos, Quaternion rot)
     {
-        this.playerCharacterRep = GameObject.Instantiate(playerCharacter, pos, rot);
-        if (this.playerCharacterRep != null)
+        this.playerCharRep = GameObject.Instantiate(playerPrefab, pos, rot);
+        if (this.playerCharRep != null)
         {
-            playerMove = playerCharacterRep.GetComponent<PlayerMove>();
-            rb = playerCharacterRep.GetComponent<Rigidbody>();
+            playerMove = playerCharRep.GetComponent<PlayerMove>();
+            rb = playerCharRep.GetComponent<Rigidbody>();
+
+            if(!SpawnPhysSceneRep(playerPrefab, pos, rot))
+            {
+                Debug.LogError("Failed to spawn player.  Could not create its physics scene representation");
+                GameObject.Destroy(playerCharRep);
+                return false;
+            }
+
             isSpawned = true;
-            lastPos = playerCharacter.transform.position;
-            lastRot = playerCharacter.transform.rotation;            
+
+            lastPos = playerCharRep.transform.position;
+            lastRot = playerCharRep.transform.rotation;            
+            return true;
+        }
+        else
+        {
+            Debug.Log("Spawn failed for player with id: " + id);
+        }
+        return false;
+    }
+
+    public bool SpawnPhysSceneRep(GameObject playerPrefab, Vector3 pos, Quaternion rot)
+    {
+        physSceneCharRep = physSceneRef.SpawnCharacterRep(playerPrefab, pos, rot);
+        if(physSceneCharRep != null)
+        {
+            physRepRB = physSceneCharRep.GetComponent<Rigidbody>();
             return true;
         }
         return false;
@@ -54,9 +82,10 @@ public class ServerPlayer
 
     public bool Despawn()
     {
-        if (playerCharacterRep != null)
+        if (playerCharRep != null)
         {
-            GameObject.Destroy(playerCharacterRep);
+            GameObject.Destroy(playerCharRep);
+            GameObject.Destroy(physSceneCharRep);
             return true;
         }
         return false;
@@ -86,8 +115,8 @@ public class ServerPlayer
                         }
                         else
                         {                           
-                            StateInfo newState = serverRef.physScene.Simulate(playerCharacterRep.transform.position, playerCharacterRep.transform.rotation, rb.velocity, rb.angularVelocity, latestInputs.messages[i].moveKeysBitmask);
-                            playerCharacterRep.transform.SetPositionAndRotation(newState.position, newState.rotation);
+                            StateInfo newState = physSceneRef.Simulate(physSceneCharRep.transform, physRepRB, playerCharRep.transform.position, playerCharRep.transform.rotation, rb.velocity, rb.angularVelocity, latestInputs.messages[i].moveKeysBitmask);
+                            playerCharRep.transform.SetPositionAndRotation(newState.position, newState.rotation);
                             playerMove.SetVelocities(newState.linearVelocity, newState.angularVelocity);
                         }                      
                         
@@ -96,15 +125,9 @@ public class ServerPlayer
                         //serverRef.SendToClient(serverRef.unreliableSimPipeline, connection, new StateInfoMessage(new StateInfo(lastProcessedInput, playerCharacterRep.transform.position, playerCharacterRep.transform.rotation, 
                                              //rb.velocity, rb.angularVelocity)));
                     }
-
-                    //Debug.LogError("Processed " + processedInputsCount + " inputs this frame.");
-                    //processedInputsCount = 0;
-
-
-                    //Debug.LogError("Server moved player (" + id + ") " + moveCounter + " times");
-                    //SendToClient(connection, new UpdatePositionMessage(lastProcessedClientInput, serverPlayer.transform.position, serverPlayer.transform.rotation));
-                    lastPos = playerCharacterRep.transform.position;
-                    lastRot = playerCharacterRep.transform.rotation;
+                 
+                    lastPos = playerCharRep.transform.position;
+                    lastRot = playerCharRep.transform.rotation;
                     hasNewSnapshotData = true;
                 }
                 else
@@ -114,12 +137,12 @@ public class ServerPlayer
                 }
             }
             //else if (lastTransform.position != playerCharacterRep.transform.position || lastTransform.rotation != playerCharacterRep.transform.rotation)//something here to send updates when objects are undergoing physics movements
-            else if (lastPos != playerCharacterRep.transform.position || lastRot != playerCharacterRep.transform.rotation)
+            else if (lastPos != playerCharRep.transform.position || lastRot != playerCharRep.transform.rotation)
             {
                 //Debug.Log("Physics Move!");
                 //SendToClient(new UpdatePositionMessage(lastProcessedInput, playerCharacterRep.transform.position, playerCharacterRep.transform.rotation));
-                lastPos = playerCharacterRep.transform.position;
-                lastRot = playerCharacterRep.transform.rotation;
+                lastPos = playerCharRep.transform.position;
+                lastRot = playerCharRep.transform.rotation;
                 hasNewSnapshotData = true;
             }
             //Debug.Log("last position: " + lastTransform.position + " - Current position: " + playerCharacterRep.transform.position);
@@ -130,11 +153,11 @@ public class ServerPlayer
     {
         hasNewSnapshotData = false;
         processedSinceLast = 0;
-        return new SnapShotInfo((short)id, playerCharacterRep.transform.position, playerCharacterRep.transform.rotation);
+        return new SnapShotInfo((short)id, playerCharRep.transform.position, playerCharRep.transform.rotation);
     }
 
     public StateInfo GetStateInfo()
     {
-        return new StateInfo(lastProcessedInput, playerCharacterRep.transform.position, playerCharacterRep.transform.rotation, rb.velocity, rb.angularVelocity);
+        return new StateInfo(lastProcessedInput, playerCharRep.transform.position, playerCharRep.transform.rotation, rb.velocity, rb.angularVelocity);
     }
 }

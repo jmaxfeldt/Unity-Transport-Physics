@@ -10,8 +10,8 @@ public class ServerMultiMovePhysScene : MonoBehaviour
     PhysicsScene physicsScene;
     [SerializeField]
     Transform SceneGeometryParent;
-    GameObject characterRep;
-    Rigidbody charRepRB;
+    //GameObject characterRep;
+    //Rigidbody charRepRB;
 
 
     void CreatePhysicsScene()
@@ -27,25 +27,32 @@ public class ServerMultiMovePhysScene : MonoBehaviour
         }
     }
 
-    public void SpawnCharacterRep(GameObject charPrefab, Vector3 position, Quaternion rotation)
+    public GameObject SpawnCharacterRep(GameObject charPrefab, Vector3 position, Quaternion rotation)
     {
-        characterRep = Instantiate(charPrefab, position, rotation);
+        GameObject characterRep = Instantiate(charPrefab, position, rotation);
         characterRep.GetComponent<Renderer>().enabled = false;
-        charRepRB = characterRep.GetComponent<Rigidbody>();
         SceneManager.MoveGameObjectToScene(characterRep, multiMoveScene);
+
+        if(characterRep != null)
+        {
+            return characterRep;
+        }
+        return null;
     }
 
-    public StateInfo Simulate(Vector3 startPos, Quaternion StartRot, Vector3 startVelocity, Vector3 startAngularVelocity, byte moveKeysBitmask)
+    public StateInfo Simulate(Transform playerRep, Rigidbody playerRepRB, Vector3 startPos, Quaternion StartRot, Vector3 startVelocity, Vector3 startAngularVelocity, byte moveKeysBitmask)
     {
-        characterRep.transform.position = startPos;
-        characterRep.transform.rotation = StartRot;
-        charRepRB.velocity = startVelocity;
-        charRepRB.angularVelocity = startAngularVelocity;
+        playerRep.GetComponent<BoxCollider>().enabled = true;
+        playerRep.position = startPos;
+        playerRep.rotation = StartRot;
+        playerRepRB.velocity = startVelocity;
+        playerRepRB.angularVelocity = startAngularVelocity;
 
-        characterRep.GetComponent<PlayerMove>().Move(moveKeysBitmask);
+        playerRep.GetComponent<PlayerMove>().Move(moveKeysBitmask);
         physicsScene.Simulate(Time.fixedDeltaTime);
+        playerRep.GetComponent<BoxCollider>().enabled = false;
 
-        return new StateInfo(0, characterRep.transform.position, characterRep.transform.rotation, charRepRB.velocity, charRepRB.angularVelocity);
+        return new StateInfo(0, playerRep.position, playerRep.rotation, playerRepRB.velocity, playerRepRB.angularVelocity);
     }
 
     // Start is called before the first frame update
