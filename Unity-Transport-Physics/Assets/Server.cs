@@ -22,10 +22,11 @@ public class Server : MonoBehaviour
 
     public GameObject playerPrefab;
 
-    float tickRate = 20;
+    float tickRate = 50;
     float nextTick = 0;
     int maxPlayers = 20;
     uint snapshotSequence = 0;
+    public uint serverTick = 0;
 
     public bool isStarted;
 
@@ -53,7 +54,7 @@ public class Server : MonoBehaviour
     public void ConfigServer()
     {
         NetworkSettings netSettings = new NetworkSettings();
-        netSettings.WithSimulatorStageParameters(3000, 256, 50, 0, 0, 0);//, 0, 0, 0);
+        netSettings.WithSimulatorStageParameters(3000, 256, 0, 0, 0, 0);//, 0, 0, 0);
         netDriver = NetworkDriver.Create(netSettings);
 
         reliableSeqSimPipeline = netDriver.CreatePipeline(typeof(ReliableSequencedPipelineStage), typeof(SimulatorPipelineStage));
@@ -195,6 +196,7 @@ public class Server : MonoBehaviour
 
     private void FixedUpdate()
     {
+        
         if (connections.Length > 0)
         {
             for (int i = 0; i < connections.Length; i++)
@@ -205,9 +207,11 @@ public class Server : MonoBehaviour
                 }
                 //Debug.LogError("Inputs processed this tick: " + players[connections[i].InternalId].processedSinceLast);
             }
+            serverTick++;
             //snapshotSequence++;
             //SnapshotCreateAndSend();           
         }
+        Physics.Simulate(Time.fixedDeltaTime);
     }
 
     // Update is called once per frame

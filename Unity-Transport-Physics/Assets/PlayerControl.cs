@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using NetMessages;
+using TMPro;
 
 public class PlayerControl : MonoBehaviour
 {
@@ -30,6 +31,7 @@ public class PlayerControl : MonoBehaviour
     List<InputMessage> unackdInputs = new List<InputMessage>(); //use a pool for this?
     //InputQueue<InputMessage> unackdIns;
     InputQueue inputQueue;
+    TMP_Text positionText;
 
     byte moveKeysBitmask = 0;
 
@@ -40,92 +42,18 @@ public class PlayerControl : MonoBehaviour
         playerMove = GetComponent<PlayerMove>();
         rb = GetComponent<Rigidbody>();
         inputQueue = new InputQueue(20);
+
+        positionText = GameObject.Find("PositionText").GetComponent<TMP_Text>();
         //unackdIns = new InputQueue<InputMessage>(50);
 
         nextPollTime = Time.time;
         lastPollTime = Time.time;
     }
 
-    int processedCount = 0;
+    //int processedCount = 0;
     void FixedUpdate()
     {
-        //if (isLocalPlayer && isSpawned)
-        //{
-        //    if (Input.GetKey(KeyCode.W))
-        //    {
-        //        moveKeysBitmask |= 1;
-        //    }
-
-        //    if (Input.GetKey(KeyCode.S))
-        //    {
-        //        moveKeysBitmask |= 2;
-        //    }
-
-        //    if (Input.GetKey(KeyCode.A))
-        //    {
-        //        moveKeysBitmask |= 4;
-        //    }
-
-        //    if (Input.GetKey(KeyCode.D))
-        //    {
-        //        moveKeysBitmask |= 8;
-        //    }
-          
-        //    inputQueue.Enqueue(moveKeysBitmask);
-            
-
-
-        //    moveKeysBitmask = 0;
-        //    //Debug.Log(Convert.ToString(moveKeysBitmask, 2).PadLeft(8, '0'));
-        //}
-
-
-        //InputMessage input = new InputMessage(inputSequence, deltaTime, moveKeysBitmask);
-        if (isSpawned)
-        {
-            //Debug.LogError("Input Queue Length: " + inputQueue.numInputs);
-
-            while (inputQueue.numInputs > 0) //Multiple moves here and on the server within a single physics update are probably not working as intended.  They should be simulated in another physics scene like with reconciliation
-            {
-              
-                InputMessage input = new InputMessage(inputSequence, Time.fixedDeltaTime, inputQueue.Dequeue());
-
-                if (usePrediction)
-                {
-                    if (inputQueue.numInputs == 1)
-                    {
-                        playerMove.Move(input.moveKeysBitmask);
-                    }
-                    else
-                    {
-                        physScene.Simulate(transform.position, transform.rotation, rb.velocity, rb.angularVelocity, moveKeysBitmask);
-                    }
-                    input.SetPredictions(transform.position, transform.rotation, rb.velocity, rb.angularVelocity);
-                    
-                    //Debug.LogError("Predicted position after Client phys move for input " + inputSequence + ": " + input.predictedPos);
-                    //Debug.Log("Sequence " + inputSequence + " predicted position: " + input.predictedPos + " -Delta time: " + deltaTime);
-                }
-                //Debug.LogError("Client processed input count: " + processedCount);
-                processedCount++;
-                unackdInputs.Add(input);
-                inputSequence++;
-
-                if (sendUnackdInputs && unackdInputs.Count > 0)
-                {
-                    //Debug.LogError("Sending input sequence (" + inputSequence +") bitmask value: " + Convert.ToString(input.moveKeysBitmask, 2).PadLeft(8, '0'));
-                    clientRef.SendToServer(clientRef.unreliableSimPipeline, new MultiInputMessage(unackdInputs));                 
-                }
-                else
-                {
-                    clientRef.SendToServer(clientRef.unreliableSimPipeline, input);
-                }
-            }
-        }
-    }
-
-    // Update is called once per frame
-    void Update()
-    {
+        //Debug.Log("Sequence " + inputSequence + " - Velocity at the start of Fixed Update: " + rb.velocity);
         if (isLocalPlayer && isSpawned)
         {
             if (Input.GetKey(KeyCode.W))
@@ -148,25 +76,120 @@ public class PlayerControl : MonoBehaviour
                 moveKeysBitmask |= 8;
             }
 
-            if (Time.time >= nextPollTime)
+            if (moveKeysBitmask != 0)
             {
-                nextPollTime = Time.time + 1 / inputPollingRate;
-                float deltaTime = Time.time - lastPollTime;
-                //Debug.Log("Delta Time: " + deltaTime);            
-                lastPollTime = Time.time;
-
-              
                 inputQueue.Enqueue(moveKeysBitmask);
-                
+            }
 
-                moveKeysBitmask = 0;
-                //Debug.Log(Convert.ToString(moveKeysBitmask, 2).PadLeft(8, '0'));
+            moveKeysBitmask = 0;
+            //Debug.Log(Convert.ToString(moveKeysBitmask, 2).PadLeft(8, '0'));
+        }
+
+        bool wasMoved = false;
+        //InputMessage input = new InputMessage(inputSequence, deltaTime, moveKeysBitmask);
+        if (isSpawned)
+        {
+            //Debug.LogError("Input Queue Length: " + inputQueue.numInputs);
+
+            while (inputQueue.numInputs > 0) //Multiple moves here and on the server within a single physics update are probably not working as intended.  They should be simulated in another physics scene like with reconciliation
+            {
+              
+                InputMessage input = new InputMessage(inputSequence, Time.fixedDeltaTime, inputQueue.Dequeue()); //inputQueue.numInputs is one less after this.  Keep this in mind if using the count somewhere after this happens
+
+                if (usePrediction)
+                {                   
+                    StateInfo newState = physScene.Simulate(transform.position, transform.rotation, rb.velocity, rb.angularVelocity, input.moveKeysBitmask);
+                    SetState(newState.position, newState.rotation, newState.linearVelocity, newState.angularVelocity);    
+                    input.SetPredictions(transform.position, transform.rotation, rb.velocity, rb.angularVelocity);
+                    wasMoved = true;                 
+                }
+         
+                //processedCount++;
+                unackdInputs.Add(input);
+                inputSequence++;
+
+                if (sendUnackdInputs && unackdInputs.Count > 0)
+                {
+                    //Debug.LogError("Sending input sequence (" + inputSequence +") bitmask value: " + Convert.ToString(input.moveKeysBitmask, 2).PadLeft(8, '0'));
+                    clientRef.SendToServer(clientRef.unreliableSimPipeline, new MultiInputMessage(unackdInputs));
+                }
+                else
+                {
+                    clientRef.SendToServer(clientRef.unreliableSimPipeline, input);
+                }
             }
         }
+        //Debug.LogError("Velocity after all inputs: " + rb.velocity);
+
+        /*Can't leave this this way.  Physics simulation should be done automatically or in another script.  Performing prediction moves in the extra physics scene
+        and then having the main scene physics simulation run causes problems because the velocities of those simulations carry over and cause the normal scene physics
+        simulation to make an extra "momentum" move that is not predicted.  Applying force in the PlayerMove.Move script also causes problems because predictions for that move can't
+        be set until after physics.simulate is called or allowed to run automatically.  It would probably be best */
+        if (wasMoved)   
+        {
+            rb.isKinematic = true;
+            Physics.Simulate(Time.fixedDeltaTime);
+            rb.isKinematic = false;
+            SetState(unackdInputs[^1].predictedPos, unackdInputs[^1].predictedRot, unackdInputs[^1].predictedVelocity, unackdInputs[^1].predictedAngularVelocity);
+        }
+        else
+        {
+            Physics.Simulate(Time.fixedDeltaTime);
+        }
+        
+        
+        positionText.text = "Position: " + transform.position;
+        //Debug.LogError("Position after normal move: " + transform.position + " - Velocity: " + rb.velocity);
+        //Debug.LogError("Position after main scene physics simulate: " + transform.position + " - Velocity: " + rb.velocity);
     }
 
+    // Update is called once per frame
+    void Update()
+    {
+        //if (isLocalPlayer && isSpawned)
+        //{
+        //    if (Input.GetKey(KeyCode.W))
+        //    {
+        //        moveKeysBitmask |= 1;
+        //    }
+
+        //    if (Input.GetKey(KeyCode.S))
+        //    {
+        //        moveKeysBitmask |= 2;
+        //    }
+
+        //    if (Input.GetKey(KeyCode.A))
+        //    {
+        //        moveKeysBitmask |= 4;
+        //    }
+
+        //    if (Input.GetKey(KeyCode.D))
+        //    {
+        //        moveKeysBitmask |= 8;
+        //    }
+
+        //    if (Time.time >= nextPollTime)
+        //    {
+        //        nextPollTime = Time.time + 1 / inputPollingRate;
+        //        float deltaTime = Time.time - lastPollTime;
+        //        //Debug.Log("Delta Time: " + deltaTime);            
+        //        lastPollTime = Time.time;
+
+              
+        //        inputQueue.Enqueue(moveKeysBitmask);
+                
+
+        //        moveKeysBitmask = 0;
+        //        //Debug.Log(Convert.ToString(moveKeysBitmask, 2).PadLeft(8, '0'));
+        //    }
+        //}
+    }
+
+    int errorCount = 0;
+    int snapshotCount = 0;
     public void HandleSnapshot(uint responseNum, Vector3 position, Quaternion rotation, Vector3 linearVelocity, Vector3 angularVelocity) //Gets called on the client when the server sends updated position
     {
+        snapshotCount++;
         bool hasPredictionError = false;
 
         if (responseNum >= lastResponseSeqNum) //Server doesn't resend snapshots.  This can't be used for things that must be reliable
@@ -180,16 +203,24 @@ public class PlayerControl : MonoBehaviour
             {
                 if (unackdInputs[i].sequenceNum == responseNum)
                 {
-                    if (Mathf.Abs(Vector3.Distance(unackdInputs[i].predictedPos, position)) > errorThreshold)// || Mathf.Abs(Vector3.Distance(unackdInputs[i].predictedRot.eulerAngles, rotation.eulerAngles)) > errorThreshold)
+                    float distanceFromPredicted = Mathf.Abs(Vector3.Distance(unackdInputs[i].predictedPos, position));
+                    if (distanceFromPredicted > errorThreshold)// || Mathf.Abs(Vector3.Distance(unackdInputs[i].predictedRot.eulerAngles, rotation.eulerAngles)) > errorThreshold)
                     {
                         hasPredictionError = true;
-                        Debug.Log("A position prediction error has occured!  Distance: " + Mathf.Abs(Vector3.Distance(unackdInputs[i].predictedPos, position)));
+                        errorCount++;
+                        //Debug.LogError("Snaphot count: " + snapshotCount + " - prediction error Count: " + errorCount);
+
+                        Debug.LogError("A position prediction error has occured!  Distance: " + Mathf.Abs(Vector3.Distance(unackdInputs[i].predictedPos, position)));
                     }
-                    //if (Mathf.Abs(Vector3.Distance(unackdInputs[i].predictedRot.eulerAngles, rotation.eulerAngles)) > errorThreshold)
-                    //{
-                    //    hasPredictionError = true;
-                    //    Debug.Log("A rotation prediction error has occured!  Distance: "  + Mathf.Abs(Vector3.Distance(unackdInputs[i].predictedRot.eulerAngles, rotation.eulerAngles)));
-                    //}
+                    else if(position == unackdInputs[i].predictedPos)
+                    {
+                        Debug.LogError("The prediction was accurate");
+                    }
+                    else
+                    {
+                        Debug.LogError("Prediction error, but under correction threshold.  Distance:  " + distanceFromPredicted);
+
+                    }
                     break;
                 }
             }
@@ -199,8 +230,11 @@ public class PlayerControl : MonoBehaviour
             {
                 int loopCount = 0;
 
-                transform.SetPositionAndRotation(position, rotation);
-                playerMove.SetVelocities(linearVelocity, angularVelocity);
+                if (hasPredictionError)
+                {
+                    transform.SetPositionAndRotation(position, rotation);
+                    playerMove.SetVelocities(linearVelocity, angularVelocity);
+                }
                 
                 while (loopCount < unackdInputs.Count)
                 {
@@ -216,12 +250,12 @@ public class PlayerControl : MonoBehaviour
                             StateInfo simState = physScene.Simulate(transform.position, transform.rotation, GetComponent<Rigidbody>().velocity, GetComponent<Rigidbody>().angularVelocity, unackdInputs[loopCount].moveKeysBitmask);
                             SetState(simState.position, simState.rotation, simState.linearVelocity, simState.angularVelocity);
 
-                            unackdInputs[loopCount].SetPredictions(transform.position, transform.rotation, rb.velocity, rb.angularVelocity);               
+                            unackdInputs[loopCount].SetPredictions(transform.position, transform.rotation, rb.velocity, rb.angularVelocity);
                         }
                         else
                         {
-                            StateInfo simState = physScene.Simulate(transform.position, transform.rotation, GetComponent<Rigidbody>().velocity, GetComponent<Rigidbody>().angularVelocity, unackdInputs[loopCount].moveKeysBitmask);
-                            SetState(simState.position, simState.rotation, simState.linearVelocity, simState.angularVelocity);
+                            //StateInfo simState = physScene.Simulate(transform.position, transform.rotation, GetComponent<Rigidbody>().velocity, GetComponent<Rigidbody>().angularVelocity, unackdInputs[loopCount].moveKeysBitmask);
+                            //SetState(simState.position, simState.rotation, simState.linearVelocity, simState.angularVelocity);
 
                             //playerMove.Move(unacknowledgedInputs[loopCount].moveKeysBitmask);
                         }

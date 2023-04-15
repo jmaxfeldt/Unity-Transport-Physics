@@ -30,20 +30,34 @@ public class ReconciliationPhysScene : MonoBehaviour
     public void SpawnCharacterRep(GameObject charPrefab, Vector3 position, Quaternion rotation)
     {
         characterRep = Instantiate(charPrefab, position, rotation);
-        characterRep.GetComponent<Renderer>().enabled = false;
-        charRepRB = characterRep.GetComponent<Rigidbody>();
-        SceneManager.MoveGameObjectToScene(characterRep, reconciliationScene);
+        if (characterRep != null)
+        {
+            characterRep.GetComponent<Renderer>().enabled = false;
+            charRepRB = characterRep.GetComponent<Rigidbody>();
+            SceneManager.MoveGameObjectToScene(characterRep, reconciliationScene);
+        }
+        else
+        {
+            Debug.LogError("Failed to spawn phsyics scene character representation.");
+        }
     }
 
     public StateInfo Simulate(Vector3 startPos, Quaternion StartRot, Vector3 startVelocity, Vector3 startAngularVelocity, byte moveKeysBitmask)
     {
-        characterRep.transform.position = startPos;
-        characterRep.transform.rotation = StartRot;
+        //Debug.LogError("Simulating....");
+
+        characterRep.transform.SetPositionAndRotation(startPos, StartRot);
         charRepRB.velocity = startVelocity;
         charRepRB.angularVelocity = startAngularVelocity;
 
         characterRep.GetComponent<PlayerMove>().Move(moveKeysBitmask);
+
+        //Debug.LogError("Position before simulate: " + characterRep.transform.position);
+        //Debug.LogError("Position before simulate move: " + characterRep.transform.position + " - Velocity: " + charRepRB.velocity);
         physicsScene.Simulate(Time.fixedDeltaTime);
+        //Debug.LogError("Position after simulate move: " + characterRep.transform.position + " - Velocity: " + charRepRB.velocity);
+        //Debug.LogError("Position after simulate: " + characterRep.transform.position);
+        //Debug.LogError("Velocity after simulate: " + charRepRB.velocity);
 
         return new StateInfo(0, characterRep.transform.position, characterRep.transform.rotation, charRepRB.velocity, charRepRB.angularVelocity);
     }

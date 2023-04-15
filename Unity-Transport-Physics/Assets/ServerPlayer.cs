@@ -107,27 +107,26 @@ public class ServerPlayer
                         {
                             continue;
                         }
-
                         //Debug.LogError("Received input sequence (" + latestInputs.messages[i].sequenceNum + ") bitmask value: " + Convert.ToString(latestInputs.messages[i].moveKeysBitmask, 2).PadLeft(8, '0'));
-                        if (i == latestInputs.messages.Length - 1)
+
+                        //If there are multiple inputs to be processed, simulate the oldest ones in the multi-move physics scene and then let the main physics simulation simulate the last one
+                        if (i == latestInputs.messages.Length - 1)//MAY BE A BAD IDEA Move doesn't move until after the physics simulation is done on the main scene.  Could accidentally send an unupdated position causing prediction to fail
                         {
+                            Debug.LogError("MOVING ID: " + id + " - sequence: " + latestInputs.messages[i].sequenceNum + " - On server tick: " + serverRef.serverTick);
                             playerMove.Move(latestInputs.messages[i].moveKeysBitmask);
                         }
                         else
-                        {                           
+                        {
                             StateInfo newState = physSceneRef.Simulate(physSceneCharRep.transform, physRepRB, playerCharRep.transform.position, playerCharRep.transform.rotation, rb.velocity, rb.angularVelocity, latestInputs.messages[i].moveKeysBitmask);
                             playerCharRep.transform.SetPositionAndRotation(newState.position, newState.rotation);
                             playerMove.SetVelocities(newState.linearVelocity, newState.angularVelocity);
-                        }                      
-                        
-                        //Debug.Log("Server player position: " + serverPlayer.transform.position);
-                        lastProcessedInput = latestInputs.messages[i].sequenceNum;
-                        //serverRef.SendToClient(serverRef.unreliableSimPipeline, connection, new StateInfoMessage(new StateInfo(lastProcessedInput, playerCharacterRep.transform.position, playerCharacterRep.transform.rotation, 
-                                             //rb.velocity, rb.angularVelocity)));
+                        }
+
+                        lastProcessedInput = latestInputs.messages[i].sequenceNum;                       
                     }
                  
-                    lastPos = playerCharRep.transform.position;
-                    lastRot = playerCharRep.transform.rotation;
+                    //lastPos = playerCharRep.transform.position;
+                    //lastRot = playerCharRep.transform.rotation;
                     hasNewSnapshotData = true;
                 }
                 else
@@ -137,14 +136,14 @@ public class ServerPlayer
                 }
             }
             //else if (lastTransform.position != playerCharacterRep.transform.position || lastTransform.rotation != playerCharacterRep.transform.rotation)//something here to send updates when objects are undergoing physics movements
-            else if (lastPos != playerCharRep.transform.position || lastRot != playerCharRep.transform.rotation)
-            {
-                //Debug.Log("Physics Move!");
-                //SendToClient(new UpdatePositionMessage(lastProcessedInput, playerCharacterRep.transform.position, playerCharacterRep.transform.rotation));
-                lastPos = playerCharRep.transform.position;
-                lastRot = playerCharRep.transform.rotation;
-                hasNewSnapshotData = true;
-            }
+            //else if (lastPos != playerCharRep.transform.position || lastRot != playerCharRep.transform.rotation)
+            //{
+            //    //Debug.Log("Physics Move!");
+            //    //SendToClient(new UpdatePositionMessage(lastProcessedInput, playerCharacterRep.transform.position, playerCharacterRep.transform.rotation));
+            //    lastPos = playerCharRep.transform.position;
+            //    lastRot = playerCharRep.transform.rotation;
+            //    hasNewSnapshotData = true;
+            //}
             //Debug.Log("last position: " + lastTransform.position + " - Current position: " + playerCharacterRep.transform.position);
         }
     }

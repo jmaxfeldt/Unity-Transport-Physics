@@ -66,7 +66,7 @@ public class Client : MonoBehaviour
     void ConfigClient()
     {
         NetworkSettings netSettings = new NetworkSettings();
-        netSettings.WithSimulatorStageParameters(3000, 256, 50, 0, 0, 0);//, 0, 0, 0);
+        netSettings.WithSimulatorStageParameters(3000, 256, 0, 0, 0, 0);//, 0, 0, 0);
         netDriver = NetworkDriver.Create(netSettings);
 
         reliableSeqSimPipeline = netDriver.CreatePipeline(typeof(ReliableSequencedPipelineStage), typeof(SimulatorPipelineStage));
@@ -267,7 +267,7 @@ public class Client : MonoBehaviour
         }
         else if(type == 3) //stateinfo
         {
-            //Debug.LogError("Received state info from the server");
+            Debug.LogError("Received state info from the server");
             StateInfo sInfo = new StateInfo(reader.ReadUInt(), ReadExtensions.ReadVector3(ref reader), ReadExtensions.ReadQuaternion(ref reader), ReadExtensions.ReadVector3(ref reader), ReadExtensions.ReadVector3(ref reader));
             localPlayer.playerControl.HandleSnapshot(sInfo.sequence, sInfo.position, sInfo.rotation, sInfo.linearVelocity, sInfo.angularVelocity);
         }
